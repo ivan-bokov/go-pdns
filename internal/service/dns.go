@@ -32,3 +32,13 @@ type KeyData struct {
 	Published bool
 	Content   string
 }
+
+type DomainInfo struct {
+	ID        int      `json:"id,omitempty"`
+	Zone      string   `json:"zone,omitempty"`
+	Kind      string   `json:"kind,omitempty"`
+	Serial    int64    `json:"serial,omitempty"`
+	Master    []string `json:"master,omitempty"`
+	LastCheck int64    `json:"last_check,omitempty"`
+	Account   string   `json:"account,omitempty"`
+}

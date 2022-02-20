@@ -22,6 +22,30 @@ func TrimWhitespaceLeft(str string) string {
 	return b.String()
 }
 
+func StringTok(dest string, ws string) []string {
+	s := make([]string, 0, 10)
+	destRune := []rune(dest)
+	S := len(destRune)
+
+	for i := 0; i < S; {
+		for i < S && strings.IndexRune(ws, destRune[i]) != -1 {
+			i++
+		}
+		if i == S {
+			return s
+		}
+		j := i
+		b := make([]rune, 0, 10)
+		for j < S && strings.IndexRune(ws, destRune[j]) == -1 {
+			b = append(b, destRune[j])
+			j++
+		}
+		s = append(s, string(b))
+		i = j
+	}
+	return s
+}
+
 func FindFirstNotOf(str string, dictionary string) int {
 	pos := -1
 

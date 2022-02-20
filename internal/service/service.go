@@ -2,6 +2,7 @@ package service
 
 import (
 	"fmt"
+	"log"
 	"strings"
 	"time"
 
@@ -255,4 +256,52 @@ func (s *Service) GetAllDomainMetadata(name string) (map[string][]string, error)
 		meta[m1] = append(meta[m1], m2)
 	}
 	return meta, nil
+}
+
+func (s *Service) GetDomainInfo(name string) (*DomainInfo, error) {
+	rows, err := s.stg.Query(
+		"info-zone-query",
+		"domain", name,
+	)
+	if err != nil {
+		return new(DomainInfo), stacktrace.Wrap(err)
+	}
+	di := new(DomainInfo)
+	if rows.Next() {
+		master := ""
+		err = rows.Scan(&di.ID, &di.Zone, &master, &di.LastCheck, &di.Serial, &di.Kind, &di.Account)
+		if err != nil {
+			log.Println("[ERROR] " + err.Error())
+			return new(DomainInfo), stacktrace.Wrap(err)
+		}
+		if master != "" {
+			di.Master = StringTok(master, " ,\t")
+		}
+	}
+	return di, nil
+}
+
+func (s *Service) GetAllDomains(includeDisabled bool) ([]*DomainInfo, error) {
+	rows, err := s.stg.Query(
+		"get-all-domains-query",
+		"include_disabled", includeDisabled,
+	)
+	if err != nil {
+		return nil, stacktrace.Wrap(err)
+	}
+	dis := make([]*DomainInfo, 0, 10)
+	for rows.Next() {
+		di := new(DomainInfo)
+		master := ""
+		err = rows.Scan(&di.ID, &di.Zone, &master, &di.LastCheck, &di.Serial, &di.Kind, &di.Account)
+		if err != nil {
+			log.Println("[ERROR] " + err.Error())
+			return nil, stacktrace.Wrap(err)
+		}
+		if master != "" {
+			di.Master = StringTok(master, " ,\t")
+		}
+		dis = append(dis, di)
+	}
+	return dis, nil
 }
