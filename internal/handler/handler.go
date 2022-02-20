@@ -1,6 +1,9 @@
 package handler
 
 import (
+	"fmt"
+	"io"
+	"log"
 	"net/http"
 	"strconv"
 
@@ -22,14 +25,29 @@ func (h *Handler) noImplementation(g *gin.Context) {
 	g.JSON(200, gin.H{"result": false})
 }
 
+func (h *Handler) logAllResponse() gin.HandlerFunc {
+	return func(g *gin.Context) {
+		uri := g.Request.URL.RequestURI()
+		method := g.Request.Method
+		body, err := io.ReadAll(g.Request.Body)
+		if err != nil {
+			log.Println(fmt.Sprintf("[ERROR]: %#v", err))
+		}
+		g.Request.Body.Close()
+		log.Println(fmt.Sprintf("URI:%s Method:%s Headers: %#v Body:%s", uri, method, g.Request.Header, string(body)))
+		g.Next()
+	}
+}
+
 func (h *Handler) InitRoutes() *gin.Engine {
 	r := gin.Default()
+	r.Use(h.logAllResponse())
 	r.GET("lookup/:qname/:qtype", h.lookup)    //++++
 	r.GET("list/:domain_id/:zonename", h.list) // ++++
 	r.GET("getbeforeandafternamesabsolute/:domain_id/:qname", h.getbeforeandafternamesabsolute)
 	r.GET("getalldomainmetadata/:name", h.getAllDomainMetadata) // ++++
 	r.GET("getdomainmetadata/:name/:kind", h.noImplementation)
-	r.PATCH("setdomainmetadata/:name/:kind", h.setdomainmetadata) //++++
+	r.PATCH("setdomainmetadata/:name/:kind", h.setDomainMetadata) //++++
 	r.GET("getdomainkeys/:name/:kind", h.noImplementation)
 	r.PUT("adddomainkey/:name", h.addDomainKey) //+++?
 	r.DELETE("removedomainkey/:name/:id", h.noImplementation)
@@ -116,7 +134,7 @@ func (h *Handler) getbeforeandafternamesabsolute(g *gin.Context) {
 
 }
 
-func (h *Handler) setdomainmetadata(g *gin.Context) {
+func (h *Handler) setDomainMetadata(g *gin.Context) {
 	name := g.Param("name")
 	kind := g.Param("kind")
 	type valueMetadata struct {
