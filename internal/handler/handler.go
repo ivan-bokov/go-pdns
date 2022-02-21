@@ -86,11 +86,13 @@ func (h *Handler) getAllDomains(g *gin.Context) {
 		disabled, err = strconv.ParseBool(g.Query("includeDisabled"))
 		if err != nil {
 			g.JSON(http.StatusBadRequest, gin.H{"result": false})
+			return
 		}
 	}
 	di, err := h.svc.GetAllDomains(disabled)
 	if err != nil {
 		g.JSON(200, gin.H{"result": false})
+		return
 	}
 	g.JSON(200, gin.H{"result": di})
 }
@@ -104,11 +106,13 @@ func (h *Handler) lookup(g *gin.Context) {
 		zoneID, err = strconv.Atoi(g.Request.Header.Get("X-RemoteBackend-zone-id"))
 		if err != nil {
 			g.JSON(http.StatusBadRequest, gin.H{"result": false})
+			return
 		}
 	}
 	listRR, err := h.svc.Lookup(qtype, qname, zoneID)
 	if err != nil {
 		g.JSON(200, gin.H{"result": false})
+		return
 	}
 	g.JSON(200, gin.H{"result": listRR})
 }
@@ -117,6 +121,7 @@ func (h *Handler) getDomainInfo(g *gin.Context) {
 	di, err := h.svc.GetDomainInfo(name)
 	if err != nil {
 		g.JSON(200, gin.H{"result": false})
+		return
 	}
 	g.JSON(200, gin.H{"result": di})
 }
@@ -129,17 +134,20 @@ func (h *Handler) list(g *gin.Context) {
 		domainID, err = strconv.Atoi(g.Request.Header.Get("X-RemoteBackend-domain-id"))
 		if err != nil {
 			g.JSON(http.StatusBadRequest, gin.H{"result": false})
+			return
 		}
 	}
 	if g.Param("domain_id") != "" {
 		domainID, err = strconv.Atoi(g.Param("domain_id"))
 		if err != nil {
 			g.JSON(http.StatusBadRequest, gin.H{"result": false})
+			return
 		}
 	}
 	listRR, err := h.svc.List(zonename, domainID, false)
 	if err != nil {
 		g.JSON(200, gin.H{"result": make([]string, 0)})
+		return
 	}
 	g.JSON(200, gin.H{"result": listRR})
 }
@@ -149,6 +157,7 @@ func (h *Handler) getAllDomainMetadata(g *gin.Context) {
 	meta, err := h.svc.GetAllDomainMetadata(name)
 	if err != nil {
 		g.JSON(200, gin.H{"result": false})
+		return
 	}
 	g.JSON(200, gin.H{"result": meta})
 }
