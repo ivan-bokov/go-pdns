@@ -45,19 +45,19 @@ func (h *Handler) InitRoutes() *gin.Engine {
 	r.GET("lookup/:qname/:qtype", h.lookup)    //++++
 	r.GET("list/:domain_id/:zonename", h.list) // ++++
 	r.GET("getbeforeandafternamesabsolute/:domain_id/:qname", h.getbeforeandafternamesabsolute)
-	r.GET("getalldomainmetadata/:name", h.getAllDomainMetadata) // ++++
-	r.GET("getdomainmetadata/:name/:kind", h.noImplementation)
-	r.PATCH("setdomainmetadata/:name/:kind", h.setDomainMetadata) //++++
-	r.GET("getdomainkeys/:name/:kind", h.noImplementation)
-	r.PUT("adddomainkey/:name", h.addDomainKey) //+++?
-	r.DELETE("removedomainkey/:name/:id", h.noImplementation)
-	r.POST("activatedomainkey/:name/:id", h.noImplementation)
-	r.POST("deactivatedomainkey/:name/:id", h.noImplementation)
-	r.POST("publishdomainkey/:name/:id", h.noImplementation)
-	r.POST("unpublishdomainkey/:name/:id", h.noImplementation)
-	r.GET("gettsigkey/:name", h.noImplementation)
-	r.GET("getdomaininfo/:name", h.getDomainInfo) // ++++
-	r.PATCH("setnotified/:id", h.setNotified)     // ++++
+	r.GET("getalldomainmetadata/:name", h.getAllDomainMetadata)    // ++++
+	r.GET("getdomainmetadata/:name/:kind", h.getDomainMetadata)    // ++++
+	r.PATCH("setdomainmetadata/:name/:kind", h.setDomainMetadata)  //++++
+	r.GET("getdomainkeys/:name", h.getDomainKeys)                  // ++++
+	r.PUT("adddomainkey/:name", h.addDomainKey)                    //+++?
+	r.DELETE("removedomainkey/:name/:id", h.removeDomainKey)       // ++++
+	r.POST("activatedomainkey/:name/:id", h.activateDomainKey)     // ++++
+	r.POST("deactivatedomainkey/:name/:id", h.deactivateDomainKey) // ++++
+	r.POST("publishdomainkey/:name/:id", h.publishDomainKey)       // ++++
+	r.POST("unpublishdomainkey/:name/:id", h.unpublishDomainKey)   // ++++
+	r.GET("gettsigkey/:name", h.getTSIGKey)                        // ++++
+	r.GET("getdomaininfo/:name", h.getDomainInfo)                  // ++++
+	r.PATCH("setnotified/:id", h.setNotified)                      // ++++
 	r.GET("isMaster/:name/:ip", h.noImplementation)
 	r.POST("supermasterbackend/:ip/:domain", h.noImplementation)
 	r.POST("createslavedomain/:ip/:domain", h.createSlaveDomain) //++++
@@ -73,10 +73,144 @@ func (h *Handler) InitRoutes() *gin.Engine {
 	r.GET("getAllDomains", h.getAllDomains) // ++++
 	r.GET("searchRecords", h.noImplementation)
 	r.GET("getUpdatedMasters", h.noImplementation)
-	r.GET("getUnfreshSlaveInfos", h.noImplementation)
-	r.PATCH("setFresh/:id", h.setFresh) // ++++
+	r.GET("getUnfreshSlaveInfos", h.getUnfreshSlaveInfos) // ++++
+	r.PATCH("setFresh/:id", h.setFresh)                   // ++++
 
 	return r
+}
+func (h *Handler) getTSIGKey(g *gin.Context) {
+	name := g.Param("name")
+	key, err := h.svc.GetTSIGKey(name)
+	if err != nil {
+		g.JSON(200, gin.H{"result": false})
+		return
+	}
+	g.JSON(200, gin.H{"result": key})
+}
+
+func (h *Handler) unpublishDomainKey(g *gin.Context) {
+	name := g.Param("name")
+	var id int
+	var err error
+	if g.Param("id") != "" {
+		id, err = strconv.Atoi(g.Param("id"))
+		if err != nil {
+			g.JSON(200, gin.H{"result": false})
+			return
+		}
+	}
+	err = h.svc.UnpublishDomainKey(name, id)
+	if err != nil {
+		g.JSON(200, gin.H{"result": false})
+		return
+	}
+	g.JSON(200, gin.H{"result": true})
+}
+func (h *Handler) publishDomainKey(g *gin.Context) {
+	name := g.Param("name")
+	var id int
+	var err error
+	if g.Param("id") != "" {
+		id, err = strconv.Atoi(g.Param("id"))
+		if err != nil {
+			g.JSON(200, gin.H{"result": false})
+			return
+		}
+	}
+	err = h.svc.PublishDomainKey(name, id)
+	if err != nil {
+		g.JSON(200, gin.H{"result": false})
+		return
+	}
+	g.JSON(200, gin.H{"result": true})
+}
+func (h *Handler) deactivateDomainKey(g *gin.Context) {
+	name := g.Param("name")
+	var id int
+	var err error
+	if g.Param("id") != "" {
+		id, err = strconv.Atoi(g.Param("id"))
+		if err != nil {
+			g.JSON(200, gin.H{"result": false})
+			return
+		}
+	}
+	err = h.svc.DeactivateDomainKey(name, id)
+	if err != nil {
+		g.JSON(200, gin.H{"result": false})
+		return
+	}
+	g.JSON(200, gin.H{"result": true})
+}
+
+func (h *Handler) activateDomainKey(g *gin.Context) {
+	name := g.Param("name")
+	var id int
+	var err error
+	if g.Param("id") != "" {
+		id, err = strconv.Atoi(g.Param("id"))
+		if err != nil {
+			g.JSON(200, gin.H{"result": false})
+			return
+		}
+	}
+	err = h.svc.ActivateDomainKey(name, id)
+	if err != nil {
+		g.JSON(200, gin.H{"result": false})
+		return
+	}
+	g.JSON(200, gin.H{"result": true})
+}
+
+func (h *Handler) removeDomainKey(g *gin.Context) {
+	name := g.Param("name")
+	var id int
+	var err error
+	if g.Param("id") != "" {
+		id, err = strconv.Atoi(g.Param("id"))
+		if err != nil {
+			g.JSON(200, gin.H{"result": false})
+			return
+		}
+	}
+	err = h.svc.RemoveDomainKey(name, id)
+	if err != nil {
+		g.JSON(200, gin.H{"result": false})
+		return
+	}
+	g.JSON(200, gin.H{"result": true})
+}
+
+func (h *Handler) getDomainKeys(g *gin.Context) {
+	name := g.Param("name")
+	keys, err := h.svc.GetDomainKeys(name)
+	if err != nil {
+		g.JSON(200, gin.H{"result": false})
+		return
+	}
+	g.JSON(200, gin.H{"result": keys})
+}
+
+func (h *Handler) getDomainMetadata(g *gin.Context) {
+	name := g.Param("name")
+	kind := g.Param("kind")
+	meta, err := h.svc.GetDomainMetadata(name, kind)
+	if err != nil {
+		g.JSON(200, gin.H{"result": false})
+		return
+	}
+	g.JSON(200, gin.H{"result": meta})
+
+}
+
+func (h *Handler) getUnfreshSlaveInfos(g *gin.Context) {
+	di, err := h.svc.GetUnfreshSlaveInfos()
+	if err != nil {
+		g.JSON(200, gin.H{"result": false})
+		return
+	}
+	g.JSON(200, gin.H{"result": di})
+
 }
 
 func (h *Handler) getAllDomains(g *gin.Context) {

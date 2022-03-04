@@ -3,6 +3,7 @@ package service
 import (
 	"fmt"
 	"log"
+	"strconv"
 	"strings"
 	"time"
 
@@ -304,4 +305,214 @@ func (s *Service) GetAllDomains(includeDisabled bool) ([]*DomainInfo, error) {
 		dis = append(dis, di)
 	}
 	return dis, nil
+}
+
+func (s *Service) GetUnfreshSlaveInfos() ([]*DomainInfo, error) {
+	rows, err := s.stg.Query(
+		"info-all-slaves-query",
+	)
+	if err != nil {
+		return nil, stacktrace.Wrap(err)
+	}
+	allSlaves := make([]*DomainInfo, 0, 10)
+	for rows.Next() {
+		sd := new(DomainInfo)
+		master := ""
+		err = rows.Scan(&sd.ID, &sd.Zone, &master, &sd.LastCheck)
+		if err != nil {
+			log.Println("[ERROR] " + err.Error())
+			return nil, stacktrace.Wrap(err)
+		}
+		if master != "" {
+			sd.Master = StringTok(master, " ,\t")
+		}
+		sd.Kind = "SLAVE"
+		allSlaves = append(allSlaves, sd)
+	}
+	unfreshDomains := make([]*DomainInfo, 0, 10)
+	for idx := range allSlaves {
+		sData, err := s.getSOA(allSlaves[idx].Zone)
+		if err != nil {
+			log.Println("[ERROR] " + err.Error())
+			continue
+		}
+		if allSlaves[idx].LastCheck+sData.Refresh < time.Now().UTC().Unix() {
+			allSlaves[idx].Serial = sData.Serial
+			unfreshDomains = append(unfreshDomains, allSlaves[idx])
+		}
+	}
+	return unfreshDomains, nil
+}
+
+func (s *Service) getSOA(domain string) (*SOAData, error) {
+	listRR, err := s.Lookup("SOA", domain, -1)
+	if err != nil {
+		return nil, stacktrace.Wrap(err)
+	}
+	sd := new(SOAData)
+	for _, v := range listRR {
+		sd.Qname = domain
+		sd.TTL = v.TTL
+		sd.DomainID = v.DomainID
+		s.fillSOAData(v.Content, sd)
+	}
+	return sd, nil
+}
+
+func (s *Service) fillSOAData(content string, sd *SOAData) {
+	parts := StringTok(content, " \t\n")
+	var err error
+	for len(parts) < 7 {
+		parts = append(parts, "")
+	}
+	sd.Nameserver = parts[0]
+	sd.Hostmaster = parts[1]
+	sd.Serial, err = strconv.ParseInt(parts[2], 10, 64)
+	if err != nil {
+		sd.Serial = 0
+	}
+	sd.Refresh, err = strconv.ParseInt(parts[3], 10, 64)
+	if err != nil {
+		sd.Refresh = 0
+	}
+	sd.Retry, err = strconv.ParseInt(parts[4], 10, 64)
+	if err != nil {
+		sd.Retry = 0
+	}
+	sd.Expire, err = strconv.ParseInt(parts[5], 10, 64)
+	if err != nil {
+		sd.Expire = 0
+	}
+	sd.Minimum, err = strconv.ParseInt(parts[6], 10, 64)
+	if err != nil {
+		sd.Minimum = 0
+	}
+
+}
+
+func (s *Service) GetDomainMetadata(name string, kind string) ([]string, error) {
+	rows, err := s.stg.Query(
+		"get-domain-metadata-query",
+		"domain", name,
+		"kind", kind,
+	)
+	if err != nil {
+		return nil, stacktrace.Wrap(err)
+	}
+	metas := make([]string, 0, 10)
+	for rows.Next() {
+		meta := ""
+		err = rows.Scan(&meta)
+		if err != nil {
+			log.Println("[ERROR] " + err.Error())
+			return nil, stacktrace.Wrap(err)
+		}
+		metas = append(metas, meta)
+	}
+	return metas, nil
+}
+
+func (s *Service) GetDomainKeys(name string) ([]*KeyData, error) {
+	if !s.dnssec {
+		return nil, stacktrace.New("Only for DNSSEC")
+	}
+	rows, err := s.stg.Query(
+		"list-domain-keys-query",
+		"domain", name,
+	)
+	if err != nil {
+		return nil, stacktrace.Wrap(err)
+	}
+	keys := make([]*KeyData, 0, 10)
+	for rows.Next() {
+		key := new(KeyData)
+		err = rows.Scan(&key.ID, &key.Flags, &key.Active, &key.Published, &key.Content)
+		if err != nil {
+			log.Println("[ERROR] " + err.Error())
+			return nil, stacktrace.Wrap(err)
+		}
+		keys = append(keys, key)
+	}
+	return keys, nil
+}
+
+func (s *Service) RemoveDomainKey(name string, id int) error {
+	if !s.dnssec {
+		return stacktrace.New("Only for DNSSEC")
+	}
+	_, err := s.stg.Exec(
+		"remove-domain-key-query",
+		"domain", name,
+		"key_id", id,
+	)
+	return err
+}
+
+func (s *Service) ActivateDomainKey(name string, id int) error {
+	if !s.dnssec {
+		return stacktrace.New("Only for DNSSEC")
+	}
+	_, err := s.stg.Exec(
+		"activate-domain-key-query",
+		"domain", name,
+		"key_id", id,
+	)
+	return err
+}
+
+func (s *Service) DeactivateDomainKey(name string, id int) error {
+	if !s.dnssec {
+		return stacktrace.New("Only for DNSSEC")
+	}
+	_, err := s.stg.Exec(
+		"deactivate-domain-key-query",
+		"domain", name,
+		"key_id", id,
+	)
+	return err
+}
+func (s *Service) PublishDomainKey(name string, id int) error {
+	if !s.dnssec {
+		return stacktrace.New("Only for DNSSEC")
+	}
+	_, err := s.stg.Exec(
+		"publish-domain-key-query",
+		"domain", name,
+		"key_id", id,
+	)
+	return err
+}
+
+func (s *Service) UnpublishDomainKey(name string, id int) error {
+	if !s.dnssec {
+		return stacktrace.New("Only for DNSSEC")
+	}
+	_, err := s.stg.Exec(
+		"unpublish-domain-key-query",
+		"domain", name,
+		"key_id", id,
+	)
+	return err
+}
+
+func (s *Service) GetTSIGKey(name string) (*TSIGKey, error) {
+	if !s.dnssec {
+		return nil, stacktrace.New("Only for DNSSEC")
+	}
+	rows, err := s.stg.Query(
+		"get-tsig-key-query",
+		"key_name", name,
+	)
+	if err != nil {
+		return nil, stacktrace.Wrap(err)
+	}
+	if rows.Next() {
+		key := new(TSIGKey)
+		err = rows.Scan(&key.Algorithm, &key.Content)
+		if err != nil {
+			return nil, stacktrace.Wrap(err)
+		}
+		return key, nil
+	}
+	return nil, stacktrace.New("Ничего не найдено")
 }
